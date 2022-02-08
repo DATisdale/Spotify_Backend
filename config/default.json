@@ -1,0 +1,4 @@
+{
+    "mongoURI": "mongodb+srv://DAkeemTisdale:Hotel@cluster0.aech4.mongodb.net/Spotify_Clone?retryWrites=true&w=majority",
+    "JWT_SECRET": "Keepgoingyougotthis"
+}
