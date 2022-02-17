@@ -22,28 +22,23 @@ router.post("/create", auth, async (req, res) => {
 });
 
 // edit playlist by id
-router.put("/edit/:id", [ auth], async (req, res) => {
-  const schema = Joi.object({
-    name: Joi.string().required(),
-    desc: Joi.string().allow(""),
-    img: Joi.string().allow(""),
-  });
-  const { error } = schema.validatePlaylist(req.body);
-  if (error) return res.status(400).send({ message: error.details[0].message });
-
-  const playlist = await Playlist.findById(req.params.id);
-  if (!playlist) return res.status(404).send({ message: "Playlist not found" });
-
-  const user = await User.findById(req.user._id);
-  if (!user._id.equals(playlist.user))
-    return res.status(403).send({ message: "User dont have access to edit" });
-
-  playlist.name = req.body.name;
-  playlist.desc = req.body.desc;
-  playlist.img = req.body.img;
-  await playlist.save();
-
-  res.status(200).send({ message: "Update Successfully" });
+router.put("/:playlistId", [ auth], async (req, res) => {
+ try{
+   const update = {
+     name:req.body.name,
+     userId: req.body.userId,
+     desc: req.body.desc,
+     songs: req.body.songs,
+     img: req.body.img
+   };
+   const playlist = await Playlist.findByIdAndUpdate(req.params.playlistId,update,{
+     new:true,
+   });
+   if(!playlist) return res.status(400).send(`Playlist not found`);
+   return res.send(playlist)
+ }catch(error){
+   return res.status(500).send(`Internal Server Error: ${error}`)
+ }
 });
 
 router.put("/add-song", auth, async (req, res) => {
