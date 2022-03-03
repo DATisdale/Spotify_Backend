@@ -8,6 +8,7 @@ const songSchema =  mongoose.Schema({
     song:{type:String,required: true},
     img:{type:String,required: true},
     duration:{type:String,required: true},
+    
 });
 
 // const validate = (song) => {

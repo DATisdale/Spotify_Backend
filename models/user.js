@@ -3,6 +3,7 @@ const Joi = require("joi");
 const jwt = require("jsonwebtoken");
 const config = require("config");
 
+
 const userSchema =  mongoose.Schema({
   name:{type:String, required:true,minLength:3, maxLength:50},
   email:{type:String, required:true,unique:true, minLength:5, maxLength:255},
@@ -10,9 +11,9 @@ const userSchema =  mongoose.Schema({
   month:{type:String, required:true},
   date:{type:String, required:true},
   year:{type:String, required:true},
-  likedSongs:{type:[String], default:[]},
   playlists:{type:[String], default:[]},
   isAdmin: {type: Boolean, default:false}
+  
 })
 
 
