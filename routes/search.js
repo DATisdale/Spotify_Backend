@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { Song } = require("../models/song");
-const { Playlist } = require("../models/playlist");
+const { Playlist } = require("../models/playList");
 const auth = require("../middleware/auth");
 
 router.get("/", auth, async (req, res) => {
@@ -18,4 +18,4 @@ router.get("/", auth, async (req, res) => {
     res.status(200).send({});
   }
 });
-module.exports = router
+module.exports = router;

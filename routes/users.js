@@ -1,101 +1,61 @@
-const { User, validateLogin, validateUser } = require("../models/user");
-const auth = require("../middleware/auth");
-const admin = require("../middleware/admin");
+const router = require("express").Router();
+const { User, validate } = require("../models/user");
 const bcrypt = require("bcrypt");
-const express = require("express");
-const router = express.Router();
+const admin = require("../middleware/admin");
+const auth = require("../middleware/auth");
+const validateObjectId = require("../middleware/validateObjectId");
 
+// create user
+router.post("/", async (req, res) => {
+  const { error } = validate(req.body);
+  if (error) return res.status(400).send({ message: error.details[0].message });
 
-
-router.post("/register", async (req, res) => {
-  console.log(req.body)
-  try {
-    const { error } = validateUser(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
-
-    let user = await User.findOne({ email: req.body.email });
-    if (user)
-      return res.status(400).send(`Email ${req.body.email} already claimed!`);
-
-    const salt = await bcrypt.genSalt(10);
-    user = new User({
-      name: req.body.name,
-      email: req.body.email,
-      password: await bcrypt.hash(req.body.password, salt),
-      month: req.body.month,
-      date: req.body.date,
-      year: req.body.year,
-      isAdmin: req.body.isAdmin,
-    });
-
-    await user.save();
-    const token = user.generateAuthToken();
+  const user = await User.findOne({ email: req.body.email });
+  if (user)
     return res
-      .header("x-auth-token", token)
-      .header("access-control-expose-headers", "x-auth-token")
-      .send({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        isAdmin: user.isAdmin,
-      });
-  } catch (ex) {
-    return res.status(500).send(`Internal Server Error: ${ex}`);
-  }
-});
+      .status(403)
+      .send({ message: "User with given email already Exist!" });
 
-router.post("/login", async (req, res) => {
-  try {
-    const { error } = validateLogin(req.body);
-    if (error) return res.status(400).send(error.details[0].message);
+  const salt = await bcrypt.genSalt(Number(process.env.SALT));
+  const hashPassword = await bcrypt.hash(req.body.password, salt);
+  let newUser = await new User({
+    ...req.body,
+    password: hashPassword,
+  }).save();
 
-    let user = await User.findOne({ email: req.body.email });
-    if (!user) return res.status(400).send(`Invalid email or password.`);
-
-    const validPassword = await bcrypt.compare(
-      req.body.password,
-      user.password
-    );
-    if (!validPassword)
-      return res.status(400).send("Invalid email or password.");
-
-    const token = user.generateAuthToken();
-    return res.send(token);
-  } catch (ex) {
-    return res.status(500).send(`Internal Server Error: ${ex}`);
-  }
+  newUser.password = undefined;
+  newUser.__v = undefined;
+  res
+    .status(200)
+    .send({ data: newUser, message: "Account created successfully" });
 });
 
 // get all users
-
-router.get("/", async (req, res) => {
-  try {
-    const users = await User.find();
-    console.log(users)
-    return res.send(users);
-  } catch (ex) {
-    return res.status(500).send(`Internal Server Error: ${ex}`);
-  }
+router.get("/", admin, async (req, res) => {
+  const users = await User.find().select("-password -__v");
+  res.status(200).send({ data: users });
 });
 
-// delete user
+// get user by id
+router.get("/:id", [validateObjectId, auth], async (req, res) => {
+  const user = await User.findById(req.params.id).select("-password -__v");
+  res.status(200).send({ data: user });
+});
 
-router.delete("/:userid", [auth, admin], async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user)
-      return res
-        .status(400)
-        .send(`User with id ${req.params.userId} does not exist!`);
-    await user.remove();
-    return res.send(user);
-  } catch (ex) {
-    return res.status(500).send(`Internal Server Error: ${ex}`);
-  }
-})
+// update user by id
+router.put("/:id", [validateObjectId, auth], async (req, res) => {
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { $set: req.body },
+    { new: true }
+  ).select("-password -__v");
+  res.status(200).send({ data: user, message: "Profile updated successfully" });
+});
 
-router.get('/current', [auth], async(req,res)=>{
-  const user = await User.findById(req.user._id);
-  return res.send(user);
-})
+// delete user by id
+router.delete("/:id", [validateObjectId, admin], async (req, res) => {
+  await User.findByIdAndDelete(req.params.id);
+  res.status(200).send({ message: "Successfully deleted user." });
+});
+
 module.exports = router;

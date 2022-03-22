@@ -3,94 +3,58 @@ const { User } = require("../models/user");
 const { Song, validate } = require("../models/song");
 const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
+const validateObjectId = require("../middleware/validateObjectId");
 
+// Create song
+router.post("/", admin, async (req, res) => {
+  const { error } = validate(req.body);
+  if (error) res.status(400).send({ message: error.details[0].message });
 
-router.post("/add", auth, async (req, res) => {
-  try{
-      const song = new Song({
-          name: req.body.name,
-          artist: req.body.artist,
-          song: req.body.song,
-          img: req.body.img,
-          duration: req.body.duration
-      })
-      await song.save();
-      return res.send(song);
-  }catch(ex){
-      return res.status(500).send(`Internal Sever Error: ${ex}`)
-  }
+  const song = await Song(req.body).save();
+  res.status(201).send({ data: song, message: "Song created successfully" });
 });
 
+// Get all songs
 router.get("/", async (req, res) => {
-  try{
-      const songs = await Song.find()
-      return res.send(songs);
-  }catch(ex){
-      return res.status(500).send(`Internal Server Error:${ex}`)
-  }
+  const songs = await Song.find();
+  res.status(200).send({ data: songs });
 });
 
-router.get("/:songid",[auth], async(req,res)=>{
-  try{
-    const song = await Song.findById(req.params.songId);
-    return res.send(song)
-  }catch(ex){
-    return res.status(500).send(`Internal Server Error: ${ex}`)
-  }
-  
-})
-
-router.put("/:songId", [auth], async (req, res) => {
-  try {
-      const update = {
-          userId: req.body.userId,
-          name: req.body.name,
-          artist: req.body.artist,
-          song: req.body.song,
-          img: req.body.img,
-          duration: req.body.duration,
-          likes: req.body.likes,
-          dislikes: req.body.dislikes
-      };
-      const song = await Song.findByIdAndUpdate(req.params.songId,update,{
-         new:true, 
-      })
-      if(!song) return res.status(400).send(`Song not found`);
-      return res.send(song)
-    }catch(error){
-        return res.status(500).send(`Internal Server Error: ${ex}`)
-    }
-});
-
-router.delete("/:songId", [auth, admin], async (req, res) => {
-  try{
-      const song = await Song.findById(req.params.songId);
-      if(!song) 
-        return res 
-        .status(400)
-        .send(`Song with ${req.params.songId} does not exist!`)
-        await song.remove();
-        return res.send(song);
-  } catch(ex){
-      return res.status(500).send(`Interanl Server Error: ${ex}`)
-  }
-});
-
-router.put("/like/:id", auth, async (req, res) => {
-  try {
-    const song = await Song.findById(req.params.id);
-    if(song.likes.filter(like=>like.user.toString()===req.user.id).length>0) {
-      return res.status(400).send({msg:'Song already liked'})
-  }
-  song.likes.unshift({user:req.user.id});
-
-  await song.save()
-  return res.send(song.likes)
-}catch (err){ 
-  return res.status(500).send('Server Error')
-}
+// Update song
+router.put("/:id", [validateObjectId, admin], async (req, res) => {
+  const song = await Song.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
   });
+  res.send({ data: song, message: "Updated song successfully" });
+});
 
+// Delete song by ID
+router.delete("/:id", [validateObjectId, admin], async (req, res) => {
+  await Song.findByIdAndDelete(req.params.id);
+  res.status(200).send({ message: "Song deleted sucessfully" });
+});
+
+// Like song
+router.put("/like/:id", [validateObjectId, auth], async (req, res) => {
+  let resMessage = "";
+  const song = await Song.findById(req.params.id);
+  if (!song) return res.status(400).send({ message: "song does not exist" });
+
+  const user = await User.findById(req.user._id);
+  const index = user.likedSongs.indexOf(song._id);
+  if (index === -1) {
+    user.likedSongs.push(song._id);
+    resMessage = "Added to your liked songs";
+  } else {
+    user.likedSongs.splice(index, 1);
+    resMessage = "Removed from your liked songs";
+  }
+
+  await user.save();
+  res.status(200).send({ message: resMessage });
+});
+
+// Get liked songs
 router.get("/like", auth, async (req, res) => {
   const user = await User.findById(req.user._id);
   const songs = await Song.find({ _id: user.likedSongs });
